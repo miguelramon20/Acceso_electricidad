@@ -1,0 +1,604 @@
+library(sp)
+library(sf)
+library(mapview)
+
+# Mapas ejemplos de datos
+
+data(meuse)
+meuse <- st_as_sf(meuse, coords = c("x", "y"), crs = 28992)
+mapview(meuse, zcol = "zinc",  map.types = "CartoDB.Voyager")
+
+
+library(malariaAtlas)
+d <- getPR(country = "Tanzania", species = "Pf")
+ggplot2::autoplot(d)
+
+
+library(spatstat)
+plot(clmfires, which.marks="cause", cols=2:5, cex=0.7)
+
+
+plot(cells)
+
+
+library(sf)
+library(ggplot2)
+
+world <- st_read(system.file("shapes/world.gpkg", package="spData"), quiet=TRUE)
+
+ggplot(data = world) +
+  geom_sf(aes(fill = pop)) +
+  scale_fill_viridis_c(option = "plasma") + 
+  theme_minimal()
+
+library(tmap)
+
+tm_shape(NLD_muni) +
+  tm_polygons(fill = "employment_rate") 
+
+
+# Aplicación
+
+## Datos
+
+library(wbstats)
+indicators <- wb_search(pattern = "access to electricity")
+print(indicators)
+d <- wb_data(indicator = "EG.ELC.ACCS.ZS",
+             start_date = 2023, end_date = 2023)
+print(head(d))
+
+
+library(dplyr)
+library(rnaturalearth)
+library(mapview)
+
+
+map <- ne_countries(continent = "Africa", returnclass = "sf")
+map <- left_join(map, d, by = c("iso_a3" = "iso3c"))
+# Elegir una paleta de colores perceptualmente uniforme
+paleta <- "YlGnBu"
+
+# Definir mejor los breaks y el título de la leyenda
+mapview(map,
+        zcol = "EG.ELC.ACCS.ZS",
+        layer.name = "Acceso a electricidad (%)",
+        legend = TRUE)
+
+# Asignamos datos Marruecos a Sahara Occidental
+map$EG.ELC.ACCS.ZS[which(map$name_es =="Sahara Occidental")]<- 100
+#Asignamos datos Somalia a Somalilandia
+map$EG.ELC.ACCS.ZS[which(map$name_es=="Somalilandia")]<-48.9
+#Nos creamos un conjunto de datos más visual
+datosgeom<-map %>%
+  dplyr::select(nombre=name_es,siglas=iso_a3,Acceso_electricidad=EG.ELC.ACCS.ZS,geometry)
+mapview(datosgeom, 
+        zcol = "Acceso_electricidad", 
+        layer.name = "Acceso a electricidad (%)",
+        legend = TRUE)
+
+## Análisis descriptivo
+
+### Tasa acceso electricidad
+
+datos <-datosgeom %>%
+  sf::st_drop_geometry()
+
+attach(datos)
+
+#Resumen general
+summary(Acceso_electricidad)
+
+#Minimo
+datos[which.min(datos$Acceso_electricidad), "nombre"]
+
+#Maximos
+max <- datos[datos$Acceso_electricidad == 100, "nombre"] 
+show(max)
+
+# Estructura de les dades
+length(Acceso_electricidad)
+
+var(Acceso_electricidad)
+
+sd(Acceso_electricidad)
+
+sd(Acceso_electricidad)/mean(Acceso_electricidad)
+
+IQR(Acceso_electricidad)
+
+library(moments)
+skewness(Acceso_electricidad)
+kurtosis(Acceso_electricidad)       
+
+
+library(ggplot2)
+
+#Histograma
+ggplot(data = data.frame(Acceso_electricidad), aes(x = Acceso_electricidad)) +
+  geom_histogram(bins = 18, fill = "steelblue", color = "white") +
+  labs(
+    title = "Tasa de acceso a la electricidad",
+    x = "Porcentaje de acceso",
+    y = "Frecuencia"
+  ) +
+  theme_minimal(base_size = 14)
+
+#Diagrama de cajas
+boxplot(Acceso_electricidad,
+        main = "Distribución del acceso a la electricidad",
+        Xlab = "Porcentaje de acceso",
+        col = "lightgreen",
+        horizontal = TRUE,
+        border = "darkgreen",
+        col.axis = "black",
+        col.lab = "black",
+        col.main = "black")
+
+library(fitdistrplus)
+
+descdist(as.numeric(Acceso_electricidad))
+
+library(tmap)
+
+tm_shape(datosgeom) + 
+  tm_polygons(col = "Acceso_electricidad", 
+              palette = "Blues", 
+              title = "Tasa de acceso a la electricidad") +
+  tm_layout(legend.outside = TRUE)
+
+##Crecimiento de población
+
+library(wbstats)
+
+indicators <- wb_search(pattern = "population growth")
+print(indicators)   #Trobem el nostre conjunt de dades en WB
+
+
+dcov <- wb_data(indicator = "SP.POP.GROW",
+                start_date = 2023, end_date = 2023) #Conjunt actualitzat
+print(dcov)
+
+#Restringimos al continente africano
+
+library(mapview)
+library(rnaturalearth)
+
+mapcov <- ne_countries(continent = "Africa", returnclass = "sf")
+mapcov <- left_join(map, dcov, by = c("iso_a3" = "iso3c"))
+mapview(mapcov, zcol = "SP.POP.GROW")
+
+
+
+# Imputacion de paises sin valor
+mapcov$SP.POP.GROW[which(mapcov$name_es =="Sahara Occidental")]<- 1.0219518
+mapcov$SP.POP.GROW[which(mapcov$name_es=="Somalilandia")]<-3.0793922
+
+datosgeomcov<-mapcov %>%
+  dplyr::select(nombre=name_es,siglas=iso_a3,Crecimiento_pob=SP.POP.GROW,geometry)
+
+library(RColorBrewer)
+
+mapview(datosgeomcov, 
+        layer.name = "Crecimiento poblacional africano (%)",
+        zcol = "Crecimiento_pob",
+        col.regions = brewer.pal(9, "YlGnBu"))  
+
+
+datoscov <-datosgeomcov %>%
+  sf::st_drop_geometry()
+
+attach(datoscov)
+
+# Resumen general
+summary(Crecimiento_pob)
+
+#Mínimo
+datoscov[which.min(Crecimiento_pob), "nombre"]
+
+#Maximo
+datoscov[which.max(Crecimiento_pob), "nombre"] 
+
+#Variabilidad
+var(Crecimiento_pob)
+sd(Crecimiento_pob)
+sd(Crecimiento_pob)/mean(Crecimiento_pob)
+IQR(Crecimiento_pob)
+
+library(moments)
+skewness(Crecimiento_pob)
+kurtosis(Crecimiento_pob) 
+
+# Histograma
+ggplot(data = data.frame(Crecimiento_pob), aes(x = Crecimiento_pob)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "white") +
+  labs(
+    title = "Tasa de crecimiento poblacional africano",
+    x = "Proporción de crecimiento exponencial",
+    y = "Frecuencia"
+  ) +
+  theme_minimal(base_size = 14)
+# Diagrama de cajas
+boxplot(Crecimiento_pob,
+        main = "Distribución del crecimiento poblacional africano",
+        Xlab = "Proporción de crecimiento exponenecial",
+        col = "lightgreen",
+        horizontal = TRUE,
+        border = "darkgreen",
+        notch = FALSE,     # usa TRUE si quieres resaltes la mediana
+        pch = 16,          # punto sólido para los outliers
+        cex = 1.2,         # tamaño del punto (outlier)
+        col.axis = "black",
+        col.lab = "black",
+        col.main = "black")
+descdist(as.numeric(Crecimiento_pob))
+
+##Correlación 
+
+datosgeomcov$Acceso_electricidad <- Acceso_electricidad
+
+library(GGally)
+ggpairs(data = datosgeomcov, columns = c("Acceso_electricidad", "Crecimiento_pob"))
+
+
+
+
+## Estudio de la autocorrelación
+
+library(spdep)
+sf_use_s2(FALSE)
+nb<-poly2nb(datosgeom, queen = TRUE)
+head(nb)
+
+plot(st_geometry(datosgeom), border = "lightgray")
+plot.nb(nb, st_geometry(datosgeom), add = TRUE)
+
+nbw <- nb2listw(nb, style = "W", zero.policy = TRUE  )
+
+# I de Moran Global
+gmoran <- moran.test(Acceso_electricidad , nbw,
+                     alternative = "greater")
+gmoran
+
+#gmoranMC <- moran.mc(map$EG.ELC.ACCS.ZS , nbw, nsim = 999)
+#gmoranMC
+
+#hist(gmoranMC$res)
+#abline(v = gmoranMC$statistic, col = "red")
+
+moran.plot(as.vector(Acceso_electricidad), listw=nbw)
+
+geary.test(Acceso_electricidad, nbw, alternative = "greater")
+
+
+d <-as.numeric(as.character(Acceso_electricidad))
+lmoran <- localmoran(d, listw=nbw, alternative = "greater")
+head(lmoran)
+
+#Asignamos los valores deseados
+
+library(tmap)
+tmap_mode("plot")
+datosgeom$lmI <- lmoran[, "Ii"] 
+datosgeom$lmZ <- lmoran[, "Z.Ii"] 
+datosgeom$lmp <- lmoran[, "Pr(z > E(Ii))"]
+
+p1 <- tm_shape(datosgeom) +
+  tm_polygons(col = "Acceso_electricidad", title = "Variable", style = "quantile") +
+  tm_layout(legend.outside = TRUE)
+
+p2 <- tm_shape(datosgeom) +
+  tm_polygons(col = "lmI", title = "I de Moran Local",
+              style = "quantile") +
+  tm_layout(legend.outside = TRUE)
+
+p3 <- tm_shape(datosgeom) +
+  tm_polygons(col = "lmZ", title = "Z-score",
+              breaks = c(-Inf, 1.65, Inf)) +
+  tm_layout(legend.outside = TRUE)
+
+p4 <- tm_shape(datosgeom) +
+  tm_polygons(col = "lmp", title = "p-valor",
+              breaks = c(-Inf, 0.05, Inf)) +
+  tm_layout(legend.outside = TRUE)
+
+tmap_arrange(p1, p2, p3, p4)
+
+
+library(tmap)
+
+tmap_mode("plot")
+
+# Añadir variables al objeto espacial
+datosgeom$lmI <- lmoran[, "Ii"] 
+datosgeom$lmZ <- lmoran[, "Z.Ii"] 
+datosgeom$lmp <- lmoran[, "Pr(z > E(Ii))"]
+
+# Mapa 1: Acceso a electricidad
+p1 <- tm_shape(datosgeom) +
+  tm_polygons(
+    fill = "Acceso_electricidad",
+    fill.scale = tm_scale_intervals(style = "quantile"),
+    fill.legend = tm_legend(title = "Acceso a electricidad")
+  ) +
+  tm_layout(legend.outside = TRUE)
+
+# Mapa 2: I de Moran Local
+p2 <- tm_shape(datosgeom) +
+  tm_polygons(
+    fill = "lmI",
+    fill.scale = tm_scale_intervals(style = "quantile"),
+    fill.legend = tm_legend(title = "I de Moran Local")
+  ) +
+  tm_layout(legend.outside = TRUE)
+
+# Mapa 3: Z-score (manual con colores)
+p3 <- tm_shape(datosgeom) +
+  tm_polygons(
+    fill = "lmZ",
+    fill.scale = tm_scale(
+      breaks = c(-Inf, 1.65, Inf),
+      values = c("lightgray", "red")
+    ),
+    fill.legend = tm_legend(title = "Z-score")
+  ) +
+  tm_layout(legend.outside = TRUE)
+
+# Mapa 4: p-valor (manual con colores)
+p4 <- tm_shape(datosgeom) +
+  tm_polygons(
+    fill = "lmp",
+    fill.scale = tm_scale(
+      breaks = c(-Inf, 0.05, Inf),
+      values = c("blue", "lightgray")
+    ),
+    fill.legend = tm_legend(title = "p-valor")
+  ) +
+  tm_layout(legend.outside = TRUE)
+
+# Mostrar los cuatro mapas
+tmap_arrange(p1, p2, p3, p4)
+
+tm_shape(datosgeom) + tm_polygons(col = "lmZ",
+                                  title = "I de Moran Local", style = "fixed",
+                                  breaks = c(-Inf, -1.96, 1.96, Inf),
+                                  labels = c("ACE Negativa", "No ACE", "ACE Positiva"),
+                                  palette =  c("blue", "white", "red")) +
+  tm_layout(legend.outside = TRUE)
+
+lmoran <- localmoran(d, nbw, alternative = "two.sided")
+head(lmoran)
+
+datosgeom$lmp <- lmoran[, 5] # p-valors a la columna 5
+mp <- moran.plot(as.vector(scale(datosgeom$Acceso_electricidad)), nbw)
+
+datosgeom$quadrant <- NA  # Inicializar la variable
+
+# high-high
+datosgeom$quadrant[which(mp$x >= 0 & mp$wx >= 0 & datosgeom$lmp <= 0.05)] <- 1
+
+# low-low
+datosgeom$quadrant[which(mp$x <= 0 & mp$wx <= 0 & datosgeom$lmp <= 0.05)] <- 2
+
+# high-low
+datosgeom$quadrant[which(mp$x >= 0 & mp$wx <= 0 & datosgeom$lmp <= 0.05)] <- 3
+
+# low-high
+datosgeom$quadrant[which(mp$x <= 0 & mp$wx >= 0 & datosgeom$lmp <= 0.05)] <- 4
+
+# non-significant
+datosgeom$quadrant[which(datosgeom$lmp > 0.05)] <- 5
+
+tmap_mode("view")
+tm_shape(datosgeom) + tm_fill(col = "quadrant", title = "",
+                        breaks = c(1, 2, 3, 4, 5, 6),
+                        palette =  c("red", "blue", "lightpink", "skyblue2", "white"),
+                        labels = c("Alto-Alto", "Bajo-Bajo", "Alto-Bajo",
+                                   "Bajo-Alto", "Insignificante")) +
+  tm_legend(text.size = 1)  + tm_borders(alpha = 0.5) +
+  tm_layout(frame = FALSE,  title = "Clusters")  +
+  tm_layout(legend.outside = TRUE)
+
+
+## Modelización Bayesiana
+
+#ueva variable
+library(boot)
+
+X <- pmin(Acceso_electricidad / 100, 0.95)
+Y <- logit(X)
+
+
+#Análisis descriptivo de la modificación:
+
+summary(Y)
+sd(Y)
+sd(Y)/mean(Y)
+var(Y)
+IQR(Y)
+library(moments)
+skewness(Y)
+kurtosis(Y)
+
+ggplot(data = data.frame(Y), aes(x = Y)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "white") +
+  labs(
+    title = "Transformación de la tasa de acceso a la electricidad",
+    x = "Variable transformada",
+    y = "Frecuencia"
+  ) +
+  theme_minimal(base_size = 14)
+descdist(as.numeric(Y))
+
+#Primer modelo
+
+library(spdep)
+library(spData)
+library(INLA)
+
+sf_use_s2(FALSE)
+nb<-poly2nb(datosgeom, queen = TRUE)
+
+#Matriz requerida por R-INLA
+
+nb2INLA("datosgeom.adj",nb)
+g <- inla.read.graph(filename="datosgeom.adj")
+
+
+
+index <- 1:nrow(datosgeom)
+formula <- Y ~ 1 + f(index, model="bym", graph = g)
+
+
+
+res <- inla(formula, family = "gaussian", data = datosgeom,
+            control.predictor = list(compute = TRUE),
+            control.compute = list(return.marginals.predictor = TRUE))
+
+
+
+summary(res)
+
+#Transformacion marginales con inla.tmarginal ()
+marginals <- lapply(res$marginals.fitted.values,
+                    FUN = function(marg){inla.tmarginal(function(x) 100*boot::inv.logit(x), marg)})
+
+# Obtencion resumenes de las marginales con inla.zmarginal ()
+marginals_summaries <- lapply(marginals,
+                              FUN = function(marg){inla.zmarginal(marg)})
+
+i <-1
+
+plot(marginals[[i]], type = "l", col = "steelblue", lwd = 2,
+     xlab = "Porcentaje de acceso a la electricidad", ylab = "Densidad",
+     main = paste("Distribución a posteriori de la media - Área de", nombre[i]))
+
+media <- marginals_summaries[[i]]$mean
+q025  <- marginals_summaries[[i]]$quant0.025
+q975  <- marginals_summaries[[i]]$quant0.975
+
+abline(v = media, col = "red", lwd = 2, lty = 2)
+abline(v = q025, col = "gray40", lty = 3)
+abline(v = q975, col = "gray40", lty = 3)
+
+legend("topright", legend = c("f(mu_i|y)","Media", "IC 95%"),
+       col = c("steelblue","red", "gray40"), lty = c(1,2,3), lwd = 2)
+
+
+
+#Mapa
+
+#Media y IC del 95 %
+datosgeom$PMoriginal <- sapply(marginals_summaries, '[[', "mean") 
+datosgeom$LLoriginal <- sapply(marginals_summaries, '[[', "quant0.025")
+datosgeom$ULoriginal <- sapply(marginals_summaries, '[[', "quant0.975")
+
+
+library(tmap)
+library(viridis)
+
+tmap_mode("plot")
+tmap_options(component.autoscale = FALSE)
+
+# Paleta y cortes comunes
+breaks <- pretty(c(datosgeom$PMoriginal, datosgeom$LLoriginal, datosgeom$ULoriginal), n = 8)
+palette <- viridis(length(breaks) - 1)
+
+# Mapa con leyenda en la esquina inferior izquierda
+tm_all <- tm_shape(datosgeom) +
+  tm_facets(free.scales = FALSE, ncol = 3) +
+  tm_fill(col = c("LLoriginal", "PMoriginal", "ULoriginal"),
+          palette = palette,
+          breaks = breaks,
+          title = "Porcentaje de acceso") +
+  tm_borders(col = "white") +
+  tm_layout(
+    legend.position = c("left", "bottom"), 
+    legend.direction = "horizontal",
+    legend.text.size = 0.35,
+    legend.title.size = 0.45,
+    panel.labels = c("Cuantil 0.025", "Media", "Cuantil 0.975")
+  )
+
+tm_all
+
+
+
+
+##Modelo con covariable
+
+
+
+formulacov <- Y ~ 1 + Crecimiento_pob + f(index, model="bym", graph = g)
+
+
+
+rescov <- inla(formulacov, family = "gaussian", data = datosgeomcov,
+               control.predictor = list(compute = TRUE),
+               control.compute = list(return.marginals.predictor = TRUE))
+
+summary(rescov)
+
+rescov$summary.fixed
+
+marg<-rescov$marginals.fixed$`Crecimiento_pob`
+
+plot(marg, type = "l", col = "steelblue", lwd= 2,
+     xlab = expression(beta[1]), ylab = "Densidad",
+     main = paste("Distribución a posteriori de", expression(beta_1)))
+
+media <- inla.emarginal(function(x) x, marg)
+ci <- inla.qmarginal(c(0.025, 0.975), marg)
+
+#x_ci <- seq(ci[1], ci[2], length.out = 200)
+#y_ci <- approx(marg[,1], marg[,2], xout = x_ci)$y
+
+abline(v = ci, col = "gray", lty = 2)
+#polygon(c(ci[1], x_ci, ci[2]),
+#        c(0, y_ci, 0),
+#        col = rgb(0,0,1,0.2), border = NA)
+
+abline(v = media, col = "red", lwd = 2, lty = 3)
+
+legend("topright", legend = c("f(beta_1|y)","Media", "IC 95%"),
+       col = c("steelblue","red", "gray40"), lty = c(1,2,3), lwd = 2)
+
+# Transformacion marginales con inla.tmarginal()
+marginals <- lapply(rescov$marginals.fitted.values,
+                    FUN = function(marg){inla.tmarginal(function(x) 100*boot::inv.logit(x), marg)})
+
+# Obtencion resumenes de marginales con inla.zmarginal()
+marginals_summaries <- lapply(marginals,
+                              FUN = function(marg){inla.zmarginal(marg)})
+
+# Media de la distribucion a posteriori de la media
+datosgeomcov$PM <- sapply(marginals_summaries, '[[', "mean")
+datosgeomcov$Acceso_electricidad <- Acceso_electricidad
+datosgeomcov$PMoriginal <- datosgeom$PMoriginal
+
+### Comparacion entre modelos
+
+library(viridis)
+
+breaks <- pretty(c(datosgeomcov$PM, datosgeomcov$Acces_electricitat), n = 8)
+palette <- viridis(length(breaks) - 1)
+
+
+
+# Mapa con leyenda en la esquina inferior izquierda
+tm_all2 <- tm_shape(datosgeomcov) +
+  tm_facets(free.scales = FALSE, ncol = 3) +
+  tm_fill(col = c("PMoriginal","PM", "Acceso_electricidad"),
+          palette = palette,
+          breaks = breaks,
+          title = "Porcentaje de acceso") +
+  tm_borders(col = "white") +
+  tm_layout(
+    legend.position = c("left", "bottom"),  # ESQUINA INFERIOR IZQUIERDA
+    legend.direction = "horizontal",
+    legend.text.size = 0.35,
+    legend.title.size = 0.45,
+    panel.labels = c("Media primer modelo", "Media segundo modelo", "Acceso a la electricidad")
+  )
+
+tm_all2
